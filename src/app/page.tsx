@@ -78,6 +78,7 @@ export default function HRMSDashboard() {
   // Hydration-safe date initialization
   React.useEffect(() => {
     setCurrentDate(new Date().toISOString().split('T')[0])
+    // Simulate Render connection retry / handshake period
     const timer = setTimeout(() => setIsWaking(false), 2000)
     return () => clearTimeout(timer)
   }, [])
