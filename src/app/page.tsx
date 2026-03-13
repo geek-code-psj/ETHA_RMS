@@ -1,209 +1,247 @@
+
 "use client"
 
 import * as React from "react"
-import { Task, TaskCard } from "@/components/task-card"
 import { WakingIndicator } from "@/components/waking-indicator"
-import { TaskDialog } from "@/components/task-dialog"
+import { EmployeeTable } from "@/components/employee-table"
+import { AttendanceGrid } from "@/components/attendance-grid"
 import { Button } from "@/components/ui/button"
-import { Plus, LayoutGrid, ListTodo, CheckCircle, RefreshCcw, Activity } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Users, CalendarCheck2, LayoutDashboard, RefreshCcw, LogOut, Plus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
+import { EmployeeDialog } from "@/components/employee-dialog"
 
-export default function RenderTasksHome() {
-  const [tasks, setTasks] = React.useState<Task[]>([])
+export type Employee = {
+  id: string
+  name: string
+  email: string
+  department: string
+  jobTitle: string
+  joinDate: string
+}
+
+export type AttendanceLog = {
+  employeeId: string
+  status: 'Present' | 'Absent' | 'Late'
+  date: string
+}
+
+export default function HRMSDashboard() {
+  const [employees, setEmployees] = React.useState<Employee[]>([])
+  const [attendance, setAttendance] = React.useState<AttendanceLog[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isWaking, setIsWaking] = React.useState(false)
-  const [dialogOpen, setDialogOpen] = React.useState(false)
-  const [editingTask, setEditingTask] = React.useState<Task | null>(null)
+  const [employeeDialogOpen, setEmployeeDialogOpen] = React.useState(false)
   const { toast } = useToast()
 
-  const fetchTasks = React.useCallback(async (isRetry = false) => {
-    let timer: NodeJS.Timeout | null = null;
+  const fetchHRData = React.useCallback(async () => {
+    let wakingTimer = setTimeout(() => setIsWaking(true), 2000)
     
-    // If the request takes > 2s, show the waking indicator
-    timer = setTimeout(() => {
-      setIsWaking(true)
-    }, 2000)
-
     try {
-      const res = await fetch('/api/tasks')
+      const [empRes, attRes] = await Promise.all([
+        fetch('/api/hrms/employees'),
+        fetch('/api/hrms/attendance')
+      ])
+
+      if (empRes.status === 503) throw new Error('SERVER_WAKING')
       
-      if (res.status === 503) {
-        throw new Error('SERVER_WAKING')
-      }
+      const empData = await empRes.json()
+      const attData = await attRes.json()
       
-      if (!res.ok) throw new Error('FETCH_FAILED')
-      
-      const data = await res.json()
-      setTasks(data)
+      setEmployees(empData)
+      setAttendance(attData)
       setIsWaking(false)
     } catch (err: any) {
       if (err.message === 'SERVER_WAKING') {
-        // Retry logic with a small delay
-        setIsWaking(true)
-        setTimeout(() => fetchTasks(true), 2000)
+        setTimeout(fetchHRData, 2500)
       } else {
-        toast({
-          title: "Connection Error",
-          description: "Failed to communicate with the Python API backend.",
-          variant: "destructive"
-        })
+        toast({ title: "API Error", description: "Failed to connect to Render Backend.", variant: "destructive" })
       }
     } finally {
-      if (timer) clearTimeout(timer)
+      clearTimeout(wakingTimer)
       setIsLoading(false)
     }
   }, [toast])
 
   React.useEffect(() => {
-    fetchTasks()
-  }, [fetchTasks])
+    fetchHRData()
+  }, [fetchHRData])
 
-  const handleDelete = async (id: string) => {
+  const handleAddEmployee = async (data: Partial<Employee>) => {
     try {
-      const res = await fetch(`/api/tasks?id=${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error()
-      setTasks(prev => prev.filter(t => t.id !== id))
-      toast({ title: "Task Deleted", description: "Successfully removed from database." })
-    } catch {
-      toast({ title: "Error", description: "Failed to delete task.", variant: "destructive" })
-    }
-  }
-
-  const handleToggle = async (task: Task) => {
-    const newStatus = task.status === 'completed' ? 'pending' : 'completed'
-    handleSave({ ...task, status: newStatus })
-  }
-
-  const handleSave = async (taskData: Partial<Task>) => {
-    const method = taskData.id ? 'PUT' : 'POST'
-    try {
-      const res = await fetch('/api/tasks', {
-        method,
-        body: JSON.stringify(taskData),
-        headers: { 'Content-Type': 'application/json' }
+      const res = await fetch('/api/hrms/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
       })
-      if (!res.ok) throw new Error()
-      const savedTask = await res.json()
-      
-      if (method === 'POST') {
-        setTasks(prev => [...prev, savedTask])
-        toast({ title: "Task Created", description: "New task added to board." })
-      } else {
-        setTasks(prev => prev.map(t => t.id === savedTask.id ? savedTask : t))
-        toast({ title: "Task Updated", description: "Changes saved to database." })
-      }
+      const newEmp = await res.json()
+      setEmployees(prev => [...prev, newEmp])
+      toast({ title: "Success", description: "Employee added to roster." })
     } catch {
-      toast({ title: "Error", description: "Failed to save task.", variant: "destructive" })
+      toast({ title: "Error", description: "Could not save employee.", variant: "destructive" })
     }
   }
 
-  const stats = {
-    total: tasks.length,
-    completed: tasks.filter(t => t.status === 'completed').length,
-    pending: tasks.filter(t => t.status !== 'completed').length
+  const handleDeleteEmployee = async (id: string) => {
+    try {
+      await fetch(`/api/hrms/employees?id=${id}`, { method: 'DELETE' })
+      setEmployees(prev => prev.filter(e => e.id !== id))
+      toast({ title: "Deleted", description: "Employee removed." })
+    } catch {
+      toast({ title: "Error", description: "Failed to delete.", variant: "destructive" })
+    }
+  }
+
+  const toggleAttendance = async (employeeId: string, currentStatus: string) => {
+    const statuses: ('Present' | 'Absent' | 'Late')[] = ['Present', 'Absent', 'Late']
+    const nextStatus = statuses[(statuses.indexOf(currentStatus as any) + 1) % 3]
+    const date = new Date().toISOString().split('T')[0]
+
+    try {
+      const res = await fetch('/api/hrms/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId, date, status: nextStatus })
+      })
+      const updatedLog = await res.json()
+      setAttendance(prev => {
+        const filtered = prev.filter(a => a.employeeId !== employeeId)
+        return [...filtered, updatedLog]
+      })
+    } catch {
+      toast({ title: "Sync Error", description: "Failed to log attendance.", variant: "destructive" })
+    }
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 font-body">
       <WakingIndicator isVisible={isWaking} />
       
-      {/* Header */}
-      <header className="sticky top-0 z-30 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-40 w-full border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-primary rounded-lg p-1.5 shadow-lg shadow-primary/20">
-              <RefreshCcw className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <h1 className="text-xl font-bold font-headline tracking-tight">RenderTasks</h1>
-          </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => fetchTasks()} disabled={isLoading} className="hidden sm:flex gap-2">
-              <Activity className={cn("h-4 w-4", isLoading && "animate-spin")} />
-              Sync API
+            <div className="bg-blue-600 rounded-lg p-2 shadow-lg shadow-blue-500/20">
+              <RefreshCcw className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">RenderHRMS</h1>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">Admin Panel • v2026</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" className="hidden sm:flex text-slate-500 hover:text-blue-600 transition-colors">
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
             </Button>
-            <Button size="sm" onClick={() => { setEditingTask(null); setDialogOpen(true) }} className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Task
+            <Button size="sm" onClick={() => setEmployeeDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 shadow-md">
+              <Plus className="h-4 w-4 mr-1" />
+              Add Employee
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        {/* Stats Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="bg-primary/5 border-primary/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
-              <LayoutGrid className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <p className="text-xs text-muted-foreground mt-1">Stored in Render PostgreSQL</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-blue-50/50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Work</CardTitle>
-              <ListTodo className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.pending}</div>
-              <p className="text-xs text-muted-foreground mt-1">Pending FastAPI processing</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-green-50/50 dark:bg-green-900/10 border-green-100 dark:border-green-900/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.completed}</div>
-              <p className="text-xs text-muted-foreground mt-1">Successfully deployed</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Task Grid */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold font-headline">Task Management</h2>
+      <main className="container mx-auto px-4 py-8 max-w-6xl">
+        <Tabs defaultValue="dashboard" className="space-y-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <TabsList className="bg-white dark:bg-slate-900 border shadow-sm">
+              <TabsTrigger value="dashboard" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600">
+                <LayoutDashboard className="h-4 w-4 mr-2" />
+                Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="employees" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600">
+                <Users className="h-4 w-4 mr-2" />
+                Staff Directory
+              </TabsTrigger>
+              <TabsTrigger value="attendance" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600">
+                <CalendarCheck2 className="h-4 w-4 mr-2" />
+                Live Attendance
+              </TabsTrigger>
+            </TabsList>
+            
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-500 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-full border shadow-sm">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              Backend: Always On
+            </div>
           </div>
-          
-          {isLoading && tasks.length === 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-48 rounded-lg border bg-card animate-pulse" />
-              ))}
+
+          <TabsContent value="dashboard" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="border-none shadow-sm bg-gradient-to-br from-blue-600 to-blue-700 text-white">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium opacity-80 uppercase tracking-wider">Total Headcount</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold">{employees.length}</div>
+                  <p className="text-xs mt-1 opacity-70">Active Employee Records</p>
+                </CardContent>
+              </Card>
+              <Card className="border-none shadow-sm bg-white dark:bg-slate-900">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-wider">Present Today</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-blue-600">
+                    {attendance.filter(a => a.status === 'Present').length}
+                  </div>
+                  <p className="text-xs mt-1 text-slate-400">Syncing with FastAPI</p>
+                </CardContent>
+              </Card>
+              <Card className="border-none shadow-sm bg-white dark:bg-slate-900">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-wider">Departments</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-slate-800 dark:text-slate-100">
+                    {new Set(employees.map(e => e.department)).size}
+                  </div>
+                  <p className="text-xs mt-1 text-slate-400">PostgreSQL Data Clusters</p>
+                </CardContent>
+              </Card>
             </div>
-          ) : tasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 bg-muted/20 rounded-xl border-2 border-dashed">
-              <ListTodo className="h-12 w-12 text-muted-foreground mb-4 opacity-20" />
-              <p className="text-muted-foreground">No tasks found. Create your first task above.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onDelete={handleDelete}
-                  onToggle={handleToggle}
-                  onEdit={(t) => { setEditingTask(t); setDialogOpen(true) }}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+            
+            <Card className="bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Recent Roster Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <EmployeeTable employees={employees.slice(0, 3)} onDelete={handleDeleteEmployee} compact />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="employees">
+            <Card className="bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm">
+              <CardContent className="p-0">
+                <EmployeeTable employees={employees} onDelete={handleDeleteEmployee} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="attendance">
+            <Card className="bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm">
+              <CardHeader className="border-b">
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-lg">Staff Attendance Grid</CardTitle>
+                  <div className="text-sm font-medium text-slate-500">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <AttendanceGrid employees={employees} attendance={attendance} onToggle={toggleAttendance} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
 
-      <TaskDialog
-        isOpen={dialogOpen}
-        task={editingTask}
-        onClose={() => { setDialogOpen(false); setEditingTask(null) }}
-        onSave={handleSave}
+      <EmployeeDialog 
+        isOpen={employeeDialogOpen} 
+        onClose={() => setEmployeeDialogOpen(false)} 
+        onSave={handleAddEmployee} 
       />
     </div>
   )

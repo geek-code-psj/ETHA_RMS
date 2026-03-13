@@ -1,0 +1,25 @@
+
+services:
+  - type: web
+    name: render-hrms-backend
+    env: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+    # Simulates the Web Service for the API
+
+  - type: static
+    name: render-hrms-frontend
+    env: static
+    plan: free
+    buildCommand: npm run build
+    publishPath: out
+    # Deploying as Static Site for instant loading
+
+databases:
+  - name: hrms-db
+    plan: free
+    # Render PostgreSQL (valid for 30 days on free tier)

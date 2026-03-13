@@ -1,76 +1,58 @@
+
 {
   "entities": {
-    "Task": {
+    "Employee": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Task",
+      "title": "Employee",
       "type": "object",
-      "description": "Represents a single task to be managed by the application, including its details and completion status.",
+      "description": "Represents an employee in the HRMS.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Task entity."
-        },
-        "title": {
-          "type": "string",
-          "description": "The title or short description of the task."
-        },
-        "description": {
-          "type": "string",
-          "description": "A more detailed description of the task, providing additional context or requirements."
-        },
-        "isCompleted": {
-          "type": "boolean",
-          "description": "Indicates whether the task has been completed (true) or is still pending (false)."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "The timestamp when the task was initially created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "The timestamp when the task was last updated.",
-          "format": "date-time"
-        }
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "department": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "joinDate": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "title",
-        "isCompleted",
-        "createdAt",
-        "updatedAt"
-      ]
+      "required": ["id", "name", "email", "department", "joinDate"]
+    },
+    "Attendance": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Attendance",
+      "type": "object",
+      "description": "Represents a daily attendance record for an employee.",
+      "properties": {
+        "id": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Present", "Absent", "Late"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "employeeId", "date", "status", "timestamp"]
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
+    "providers": ["password", "anonymous"]
   },
   "firestore": {
     "structure": [
       {
-        "path": "/users/{userId}/tasks/{taskId}",
+        "path": "/users/{userId}/employees/{employeeId}",
         "definition": {
-          "entityName": "Task",
-          "schema": {
-            "$ref": "#/backend/entities/Task"
-          },
-          "description": "Represents a collection of tasks owned by a specific user. Each document in this subcollection is a 'Task' entity. The `{userId}` segment denotes the owner of these tasks, enforcing path-based ownership for authorization independence. The `{taskId}` segment uniquely identifies a specific task.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user who owns these tasks."
-            },
-            {
-              "name": "taskId",
-              "description": "The unique identifier of the Task document."
-            }
-          ]
+          "entityName": "Employee",
+          "schema": { "$ref": "#/backend/entities/Employee" },
+          "description": "Collection of employees for a given HR admin."
+        }
+      },
+      {
+        "path": "/users/{userId}/attendance/{attendanceId}",
+        "definition": {
+          "entityName": "Attendance",
+          "schema": { "$ref": "#/backend/entities/Attendance" },
+          "description": "Global attendance logs indexed by date/employee for the HR admin."
         }
       }
-    ],
-    "reasoning": "The recommended Firestore structure for RenderTasks prioritizes security, scalability, and debuggability in alignment with the core design principles.\n\n**Authorization Independence:** Task entities are structured under `/users/{userId}/tasks/{taskId}`. This path-based ownership means that the `userId` in the path segment directly identifies the owner of the tasks within that subcollection. Firebase Security Rules can authorize access by simply checking if `request.auth.uid == userId`. This completely eliminates the need for `get()` operations in security rules to fetch parent documents or denormalized `ownerId` fields from the task document itself, thereby ensuring authorization independence and enabling atomic batch/transactional operations without breaking security.\n\n**QAPs (Rules are not Filters):** This hierarchical structure inherently supports secure `list` operations. When a user requests their tasks, the client-side query will be scoped to `/users/{request.auth.uid}/tasks`. The security rules, by validating that the `{userId}` wildcard matches `request.auth.uid`, automatically restrict the `list` operation to only return tasks owned by the authenticated user. This prevents inefficient and insecure queries that attempt to list all tasks in a global collection and rely on rules to filter the results. The structural segregation by `userId` ensures that each user's tasks are stored in a logically separate and securely bounded context.\n\n**Structural Segregation:** All documents within a specific `/users/{userId}/tasks` subcollection share a homogeneous security posture: they are owned by `{userId}`. This simplifies security rules, as there's no need to handle varying access levels or different types of tasks (e.g., public vs. private) within the same collection. Each user's tasks are clearly separated, improving clarity and maintainability.\n\n**Access Modeling:** Path-based ownership (`/users/{userId}/tasks/{taskId}`) is chosen for private, user-owned data, making ownership explicit and rule definitions straightforward. The `taskId` within the path corresponds to the `id` field of the Task entity, ensuring consistent identification."
+    ]
   }
 }
