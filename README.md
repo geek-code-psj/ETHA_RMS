@@ -1,13 +1,13 @@
 
-# RenderHRMS - Production Human Resource Management System
+# ETHA_RMS - Production Human Resource Management System
 
 A resilient, professional HR portal optimized for the **Render 2026 Free Tier**, built with Next.js, TypeScript, and Tailwind CSS.
 
 ## Technical Architecture
-- **Frontend**: Next.js 15 (App Router) deployed as a Render Static Site for always-on availability and SEO.
+- **Frontend**: Next.js 15 (App Router) deployed as a Render Static Site for always-on availability.
 - **Backend**: Cloud Firestore for scalable, multi-tenant data management with real-time synchronization.
 - **Security**: Firebase Authentication for secure admin access (Email/Password & Anonymous Guest modes).
-- **Resilience Layer**: Implements a simulated "Cold Start" handler and waking indicator to manage user expectations during initial server-side handshakes.
+- **Resilience Layer**: Implements a simulated "Cold Start" handler and waking indicator to manage user expectations during initial data handshakes.
 
 ## Key Features
 - **Comprehensive Employee Directory**: Full CRUD management of staff records with profile avatars.
@@ -16,10 +16,10 @@ A resilient, professional HR portal optimized for the **Render 2026 Free Tier**,
 - **Admin Dashboard**: Real-time organizational health metrics and staff growth monitoring.
 
 ## Deployment on Render
-- **Dashboard URL**: [Your Render Static Site URL]
+- **Repository URL**: https://github.com/geek-code-psj/ETHA_RMS.git
 - **Environment**: Node.js 20+
 - **Build Command**: `npm run build`
-- **Output Directory**: `out` (if static) or standard Web Service.
+- **Output Directory**: `out`
 
 ## Resilience Strategy
-To handle Render's free tier cold starts, the application uses an asynchronous "Waking" indicator. While the frontend remains responsive, critical data handshakes are visualized through a progressive loading bar, ensuring a professional and transparent user experience.
+To handle Render's free tier cold starts, the application uses an asynchronous "Waking" indicator. While the frontend remains responsive, critical data handshakes are visualized through a progressive loading bar, ensuring a professional and transparent user experience even when the cloud services are initializing.

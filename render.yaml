@@ -1,20 +1,14 @@
 
 services:
-  - type: web
-    name: render-hrms-dashboard
+  - type: static
+    name: etha-rms-frontend
     env: node
     plan: free
     buildCommand: npm run build
-    startCommand: npm start
+    publishDir: out
     envVars:
       - key: NODE_VERSION
         value: 20
       - key: NEXT_TELEMETRY_DISABLED
         value: 1
-    # Note: Static Site is preferred for pure frontend, 
-    # but Web Service allows for full SSR if needed later.
-
-databases:
-  - name: hrms-db-sim
-    plan: free
-    # Simulates the PostgreSQL persistent layer for compliance with the prompt
+    # Optimized for Render Static Site to ensure 'Always On' availability
