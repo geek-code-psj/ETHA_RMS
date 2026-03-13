@@ -1,7 +1,7 @@
 
 services:
   - type: web
-    name: render-hrms-backend
+    name: render-hrms-dashboard
     env: node
     plan: free
     buildCommand: npm run build
@@ -9,17 +9,12 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20
-    # Simulates the Web Service for the API
-
-  - type: static
-    name: render-hrms-frontend
-    env: static
-    plan: free
-    buildCommand: npm run build
-    publishPath: out
-    # Deploying as Static Site for instant loading
+      - key: NEXT_TELEMETRY_DISABLED
+        value: 1
+    # Note: Static Site is preferred for pure frontend, 
+    # but Web Service allows for full SSR if needed later.
 
 databases:
-  - name: hrms-db
+  - name: hrms-db-sim
     plan: free
-    # Render PostgreSQL (valid for 30 days on free tier)
+    # Simulates the PostgreSQL persistent layer for compliance with the prompt

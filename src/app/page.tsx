@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -17,7 +18,8 @@ import {
   ShieldCheck, 
   TrendingUp,
   UserCheck,
-  UserPlus
+  UserPlus,
+  ArrowRight
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
@@ -36,6 +38,7 @@ import {
   setDocumentNonBlocking 
 } from "@/firebase/non-blocking-updates"
 import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
 
 export type Employee = {
   id: string
@@ -62,6 +65,14 @@ export default function HRMSDashboard() {
 
   const [isWaking, setIsWaking] = React.useState(true)
   const [employeeDialogOpen, setEmployeeDialogOpen] = React.useState(false)
+  const [currentDate, setCurrentDate] = React.useState<string>("")
+
+  // Hydration-safe date initialization
+  React.useEffect(() => {
+    setCurrentDate(new Date().toISOString().split('T')[0])
+    const timer = setTimeout(() => setIsWaking(false), 2000)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Redirect if not logged in
   React.useEffect(() => {
@@ -76,26 +87,19 @@ export default function HRMSDashboard() {
     return collection(db, "users", user.uid, "employees")
   }, [db, user])
 
-  const todayDate = new Date().toISOString().split('T')[0]
   const attendanceQuery = useMemoFirebase(() => {
-    if (!db || !user) return null
+    if (!db || !user || !currentDate) return null
     return query(
       collection(db, "users", user.uid, "attendance"),
-      where("date", "==", todayDate)
+      where("date", "==", currentDate)
     )
-  }, [db, user, todayDate])
+  }, [db, user, currentDate])
 
   const { data: employeesData, isLoading: empsLoading } = useCollection<Employee>(employeesQuery)
   const { data: attendanceData, isLoading: attsLoading } = useCollection<AttendanceLog>(attendanceQuery)
 
   const employees = employeesData ?? []
   const attendance = attendanceData ?? []
-
-  // Simulation effect for "Waking Up" UX
-  React.useEffect(() => {
-    const timer = setTimeout(() => setIsWaking(false), 2500)
-    return () => clearTimeout(timer)
-  }, [])
 
   const handleAddEmployee = (data: Partial<Employee>) => {
     if (!user || !db) return
@@ -115,16 +119,16 @@ export default function HRMSDashboard() {
   }
 
   const toggleAttendance = (employeeId: string, currentStatus: string) => {
-    if (!user || !db) return
+    if (!user || !db || !currentDate) return
     const statuses: ('Present' | 'Absent' | 'Late')[] = ['Present', 'Absent', 'Late']
     const nextStatus = statuses[(statuses.indexOf(currentStatus as any) + 1) % 3]
     
-    const attendanceId = `${employeeId}_${todayDate}`
+    const attendanceId = `${employeeId}_${currentDate}`
     const docRef = doc(db, "users", user.uid, "attendance", attendanceId)
     
     setDocumentNonBlocking(docRef, {
       employeeId,
-      date: todayDate,
+      date: currentDate,
       status: nextStatus,
       timestamp: new Date().toISOString()
     }, { merge: true })
@@ -138,20 +142,20 @@ export default function HRMSDashboard() {
   if (isUserLoading || !user) return null
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 font-body">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950">
       <WakingIndicator isVisible={isWaking} />
       
-      <header className="sticky top-0 z-40 w-full border-b bg-white/95 dark:bg-slate-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+      <header className="sticky top-0 z-40 w-full border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="bg-blue-600 rounded-xl p-2 shadow-lg shadow-blue-500/30">
-              <RefreshCcw className="h-6 w-6 text-white" />
+            <div className="bg-blue-600 rounded-xl p-2 shadow-lg shadow-blue-600/20">
+              <RefreshCcw className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">RenderHRMS</h1>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-                <ShieldCheck className="h-3 w-3 text-green-500" />
-                Admin: {user.email?.split('@')[0]}
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white leading-tight">RenderHRMS</h1>
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                <ShieldCheck className="h-3 w-3 text-emerald-500" />
+                Session Active
               </div>
             </div>
           </div>
@@ -160,7 +164,7 @@ export default function HRMSDashboard() {
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out
             </Button>
-            <Button size="sm" onClick={() => setEmployeeDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 shadow-md">
+            <Button size="sm" onClick={() => setEmployeeDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 shadow-sm">
               <Plus className="h-4 w-4 mr-1" />
               Add Staff
             </Button>
@@ -170,7 +174,7 @@ export default function HRMSDashboard() {
 
       <main className="container mx-auto px-4 py-8 max-w-6xl">
         <Tabs defaultValue="dashboard" className="space-y-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <TabsList className="bg-white dark:bg-slate-900 border p-1 rounded-xl shadow-sm">
               <TabsTrigger value="dashboard" className="rounded-lg px-4 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600">
                 <LayoutDashboard className="h-4 w-4 mr-2" />
@@ -186,59 +190,55 @@ export default function HRMSDashboard() {
               </TabsTrigger>
             </TabsList>
             
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-white dark:bg-slate-900 px-4 py-2 rounded-full border shadow-sm">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-white dark:bg-slate-900 border shadow-sm">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-300 tracking-wide">
+                {user.isAnonymous ? 'Guest Admin' : user.email?.split('@')[0]}
               </span>
-              Identity: {user.isAnonymous ? 'Guest Admin' : 'Secure Session'}
             </div>
           </div>
 
-          <TabsContent value="dashboard" className="space-y-8">
+          <TabsContent value="dashboard" className="space-y-8 outline-none">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="border-none shadow-md bg-gradient-to-br from-blue-600 to-indigo-700 text-white overflow-hidden relative">
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Users className="h-24 w-24" />
-                </div>
+              <Card className="border-none shadow-md bg-gradient-to-br from-blue-600 to-indigo-700 text-white overflow-hidden">
                 <CardHeader className="pb-2">
-                  <CardDescription className="text-blue-100 font-medium uppercase tracking-wider text-xs">Total Roster</CardDescription>
-                  <CardTitle className="text-4xl font-extrabold">{empsLoading ? <Skeleton className="h-10 w-16 bg-white/20" /> : employees.length}</CardTitle>
+                  <CardDescription className="text-blue-100 font-bold uppercase tracking-wider text-[10px]">Active Roster</CardDescription>
+                  <CardTitle className="text-4xl font-black">{empsLoading ? <Skeleton className="h-10 w-16 bg-white/20" /> : employees.length}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-1.5 text-xs text-blue-100">
+                  <div className="flex items-center gap-1.5 text-xs text-blue-100 font-medium">
                     <TrendingUp className="h-3 w-3" />
-                    <span>Active employees under management</span>
+                    <span>Total staff under management</span>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="border-none shadow-md bg-white dark:bg-slate-900">
                 <CardHeader className="pb-2">
-                  <CardDescription className="text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider text-xs">Present Today</CardDescription>
-                  <CardTitle className="text-4xl font-extrabold text-slate-900 dark:text-white">
+                  <CardDescription className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[10px]">Present Today</CardDescription>
+                  <CardTitle className="text-4xl font-black text-slate-900 dark:text-white">
                     {attsLoading ? <Skeleton className="h-10 w-16" /> : attendance.filter(a => a.status === 'Present').length}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-bold">
                     <UserCheck className="h-3 w-3" />
-                    <span>Real-time status sync active</span>
+                    <span>Live status sync active</span>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="border-none shadow-md bg-white dark:bg-slate-900">
                 <CardHeader className="pb-2">
-                  <CardDescription className="text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider text-xs">Departments</CardDescription>
-                  <CardTitle className="text-4xl font-extrabold text-slate-900 dark:text-white">
+                  <CardDescription className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[10px]">Departments</CardDescription>
+                  <CardTitle className="text-4xl font-black text-slate-900 dark:text-white">
                     {empsLoading ? <Skeleton className="h-10 w-16" /> : new Set(employees.map(e => e.department)).size}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-1.5 text-xs text-blue-600 font-medium">
+                  <div className="flex items-center gap-1.5 text-xs text-blue-600 font-bold">
                     <LayoutDashboard className="h-3 w-3" />
-                    <span>Distinct operational groups</span>
+                    <span>Organizational groups</span>
                   </div>
                 </CardContent>
               </Card>
@@ -246,15 +246,12 @@ export default function HRMSDashboard() {
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <Card className="lg:col-span-2 bg-white dark:bg-slate-900 border-none shadow-md overflow-hidden">
-                <CardHeader className="border-b bg-slate-50/50 dark:bg-slate-800/50">
+                <CardHeader className="border-b bg-slate-50/50 dark:bg-slate-800/50 py-4">
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle className="text-lg">Recent Staff Activity</CardTitle>
-                      <CardDescription>Latest additions to your organization</CardDescription>
+                      <CardTitle className="text-base font-bold">Recent Staff Additions</CardTitle>
+                      <CardDescription className="text-xs">Latest onboarding activity</CardDescription>
                     </div>
-                    <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => router.push("#employees")}>
-                      View All
-                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -265,42 +262,52 @@ export default function HRMSDashboard() {
                   ) : (
                     <EmployeeTable employees={employees.slice(0, 5)} onDelete={handleDeleteEmployee} compact />
                   )}
+                  {employees.length > 5 && (
+                    <div className="p-4 border-t bg-slate-50/30 dark:bg-slate-800/30 text-center">
+                      <Button variant="link" size="sm" className="text-blue-600 font-bold text-xs">
+                        View Full Directory <ArrowRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              <Card className="bg-white dark:bg-slate-900 border-none shadow-md">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Quick Actions</CardTitle>
-                  <CardDescription>Common HR operations</CardDescription>
+              <Card className="bg-white dark:bg-slate-900 border-none shadow-md h-fit">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-base font-bold">Quick Actions</CardTitle>
+                  <CardDescription className="text-xs">Common HR tasks</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button variant="outline" className="w-full justify-start gap-3 h-12" onClick={() => setEmployeeDialogOpen(true)}>
+                  <Button variant="outline" className="w-full justify-start gap-3 h-11 text-xs font-bold border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => setEmployeeDialogOpen(true)}>
                     <UserPlus className="h-4 w-4 text-blue-600" />
-                    Hire New Employee
+                    Onboard New Staff
                   </Button>
-                  <Button variant="outline" className="w-full justify-start gap-3 h-12" onClick={() => router.push("#attendance")}>
-                    <CalendarCheck2 className="h-4 w-4 text-green-600" />
-                    Manage Today's Logs
+                  <Button variant="outline" className="w-full justify-start gap-3 h-11 text-xs font-bold border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => router.push("#attendance")}>
+                    <CalendarCheck2 className="h-4 w-4 text-emerald-600" />
+                    Review Daily Logs
                   </Button>
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-dashed mt-4 text-center">
-                    <p className="text-xs text-slate-500 font-medium">All data is encrypted and synced to Render Cloud PostgreSQL simulation.</p>
+                  <div className="mt-6 p-4 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30">
+                    <p className="text-[10px] text-blue-700 dark:text-blue-400 font-bold uppercase tracking-widest mb-1">System Health</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Connected to Render Cloud. All records are secured via encrypted Firestore tunnels.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
-          <TabsContent value="employees">
+          <TabsContent value="employees" className="outline-none">
             <Card className="bg-white dark:bg-slate-900 border-none shadow-lg overflow-hidden">
-              <CardHeader className="bg-slate-50/50 dark:bg-slate-800/50 border-b">
+              <CardHeader className="bg-white dark:bg-slate-900 border-b py-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <CardTitle className="text-xl">Staff Directory</CardTitle>
-                    <CardDescription>Comprehensive list of all registered employees</CardDescription>
+                    <CardTitle className="text-xl font-black text-slate-900 dark:text-white">Staff Directory</CardTitle>
+                    <CardDescription className="text-sm">Manage employee profiles and organizational roles</CardDescription>
                   </div>
-                  <Button onClick={() => setEmployeeDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Add New Employee
+                  <Button onClick={() => setEmployeeDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 h-10 px-6 font-bold shadow-md shadow-blue-600/20">
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Hire
                   </Button>
                 </div>
               </CardHeader>
@@ -316,16 +323,16 @@ export default function HRMSDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="attendance">
+          <TabsContent value="attendance" className="outline-none">
             <Card className="bg-white dark:bg-slate-900 border-none shadow-lg overflow-hidden">
-              <CardHeader className="bg-slate-50/50 dark:bg-slate-800/50 border-b">
+              <CardHeader className="bg-white dark:bg-slate-900 border-b py-6">
                 <div className="flex justify-between items-center">
                   <div>
-                    <CardTitle className="text-xl">Attendance Management</CardTitle>
-                    <CardDescription>Record and update daily status logs</CardDescription>
+                    <CardTitle className="text-xl font-black text-slate-900 dark:text-white">Daily Attendance</CardTitle>
+                    <CardDescription className="text-sm">Record and sync daily status for all active staff</CardDescription>
                   </div>
-                  <div className="bg-white dark:bg-slate-800 px-4 py-1.5 rounded-lg border shadow-sm text-sm font-semibold text-blue-600">
-                    {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-xl border border-blue-100 dark:border-blue-800 text-xs font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest">
+                    {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                   </div>
                 </div>
               </CardHeader>
@@ -348,6 +355,14 @@ export default function HRMSDashboard() {
         onClose={() => setEmployeeDialogOpen(false)} 
         onSave={handleAddEmployee} 
       />
+      
+      <footer className="container mx-auto px-4 py-12 text-center border-t mt-12 bg-white/50">
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <RefreshCcw className="h-4 w-4 text-slate-400" />
+          <span className="text-sm font-black text-slate-800 tracking-tighter">RenderHRMS <span className="text-blue-600">v1.0</span></span>
+        </div>
+        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Optimized for Render Cloud 2026</p>
+      </footer>
     </div>
   )
 }
