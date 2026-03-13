@@ -73,8 +73,12 @@ export default function HRMSDashboard() {
     )
   }, [db, user, todayDate])
 
-  const { data: employees = [], isLoading: empsLoading } = useCollection<Employee>(employeesQuery)
-  const { data: attendance = [], isLoading: attsLoading } = useCollection<AttendanceLog>(attendanceQuery)
+  const { data: employeesData, isLoading: empsLoading } = useCollection<Employee>(employeesQuery)
+  const { data: attendanceData, isLoading: attsLoading } = useCollection<AttendanceLog>(attendanceQuery)
+
+  // Explicit fallback to empty arrays as destructuring defaults don't catch 'null'
+  const employees = employeesData ?? []
+  const attendance = attendanceData ?? []
 
   // Simulation effect for "Waking Up" UX
   React.useEffect(() => {
