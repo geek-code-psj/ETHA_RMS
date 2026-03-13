@@ -1,14 +1,32 @@
 
 services:
+  # 1. Frontend: Next.js Static Site
   - type: static
     name: etha-rms-frontend
     env: node
     plan: free
-    buildCommand: npm run build
+    buildCommand: npm install && npm run build
     publishDir: out
+    rootDir: frontend
     envVars:
       - key: NODE_VERSION
         value: 20
       - key: NEXT_TELEMETRY_DISABLED
         value: 1
-    # Optimized for Render Static Site to ensure 'Always On' availability
+
+  # 2. Backend: FastAPI Python Web Service
+  - type: web
+    name: etha-rms-backend
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    rootDir: backend
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+
+databases:
+  - name: etha-rms-db
+    plan: free
+    region: oregon
