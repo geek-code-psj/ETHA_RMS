@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * DOCUMENTATION: TASK MANAGEMENT SECURITY MODEL
+     *
+     * Core Philosophy: 
+     * This ruleset implements a strict path-based ownership model. Data is partitioned by 
+     * Firebase Authentication UIDs to ensure that users can only access their own tasks.
+     *
+     * Data Structure:
+     * - /users/{userId}: The root document for a specific user.
+     * - /users/{userId}/tasks/{taskId}: A subcollection containing individual Task entities.
+     *
+     * Key Security Decisions:
+     * - Path-Based Authorization: We rely on the {userId} wildcard in the document path to 
+     *   determine ownership. This is highly performant as it avoids extra 'get()' calls.
+     * - Relational Integrity: On creation, we enforce that the 'id' field within the 
+     *   task document matches the 'taskId' in the URL path.
+     * - Prototyping Mode: Schema validation (types, required fields) is omitted to allow 
+     *   for rapid frontend iteration, while strict ownership is enforced.
+     * - Rules are not Filters: Client-side queries must be scoped to a specific user's 
+     *   subcollection for the security rules to permit the request.
+     */
+
+    // --- Global Helper Functions ---
+
+    /**
+     * @description Simple check if the request is from an authenticated user.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Combines ownership check with a check that the resource exists.
+     * Used for update and delete operations to prevent actions on non-existent documents.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    // --- Collection Rules ---
+
+    /**
+     * @description Rules for the root user document.
+     * @path /users/{userId}
+     * @allow (create) if the user is creating their own profile document.
+     * @deny (read/write) if the auth UID does not match the userId in the path.
+     * @principle Self-Creation and Ownership.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Users cannot list other users
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Rules for the tasks subcollection owned by a user.
+       * @path /users/{userId}/tasks/{taskId}
+       * @allow (create) if auth UID matches userId AND taskId matches data.id.
+       * @deny (list) if the client attempts to list tasks across multiple users.
+       * @principle Path-based ownership for authorization independence.
+       */
+      match /tasks/{taskId} {
+        
+        // Read Permissions
+        allow get, list: if isOwner(userId);
+
+        // Write Permissions
+        // We enforce that the internal 'id' matches the path 'taskId' for relational integrity.
+        allow create: if isOwner(userId) && (request.resource.data.id == taskId);
+
+        // We enforce that the 'id' field is immutable during updates.
+        allow update: if isExistingOwner(userId) && (request.resource.data.id == resource.data.id);
+
+        allow delete: if isExistingOwner(userId);
+      }
+    }
+
+    // --- Default Deny ---
+    // Explicitly deny access to any other paths not defined above.
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
