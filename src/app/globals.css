@@ -62,3 +62,8 @@
     @apply bg-background text-foreground font-body antialiased;
   }
 }
+
+/* Custom UI Polish */
+.tabs-trigger-active {
+  @apply bg-blue-50 text-blue-600 shadow-sm;
+}
