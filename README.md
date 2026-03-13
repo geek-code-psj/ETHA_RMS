@@ -1,22 +1,25 @@
 
-# RenderHRMS - Lightweight Human Resource Management System
+# RenderHRMS - Production Human Resource Management System
 
-This application is optimized for the **Render 2026 Free Tier**, featuring a resilient full-stack architecture.
+A resilient, professional HR portal optimized for the **Render 2026 Free Tier**, built with Next.js, TypeScript, and Tailwind CSS.
 
-## Technical Summary
-- **Frontend**: Next.js (TypeScript) deployed as a Render Static Site for always-on availability.
-- **Backend Simulation**: Next.js API Routes modeling a FastAPI architecture with PostgreSQL connectivity logic.
-- **Resilience Layer**: Implements a simulated "Cold Start" handler with exponential backoff logic for database connections.
-- **UI/UX**: Features a "Waking up Python Server..." progress bar using the Inter font when the API is starting from a cold state.
+## Technical Architecture
+- **Frontend**: Next.js 15 (App Router) deployed as a Render Static Site for always-on availability and SEO.
+- **Backend**: Cloud Firestore for scalable, multi-tenant data management with real-time synchronization.
+- **Security**: Firebase Authentication for secure admin access (Email/Password & Anonymous Guest modes).
+- **Resilience Layer**: Implements a simulated "Cold Start" handler and waking indicator to manage user expectations during initial server-side handshakes.
 
-## Core Features
-- **Employee Directory**: Full CRUD management of staff records.
-- **Attendance Tracking**: A live daily grid to toggle status (Present, Absent, Late).
-- **Admin Dashboard**: Real-time stats and department-wide monitoring.
+## Key Features
+- **Comprehensive Employee Directory**: Full CRUD management of staff records with profile avatars.
+- **Daily Attendance Grid**: Real-time status logging (Present, Absent, Late) with automatic persistence.
+- **Internal Task Pipeline**: Track HR priorities and onboarding requirements with a dedicated Kanban-style view.
+- **Admin Dashboard**: Real-time organizational health metrics and staff growth monitoring.
 
-## Live Deployment
-- **Frontend URL**: [Will be provided by Render upon deployment]
-- **API Endpoint**: /api/hrms/*
+## Deployment on Render
+- **Dashboard URL**: [Your Render Static Site URL]
+- **Environment**: Node.js 20+
+- **Build Command**: `npm run build`
+- **Output Directory**: `out` (if static) or standard Web Service.
 
-## Database Handling
-Uses Render PostgreSQL logic. Note that free-tier databases on Render expire after 30 days and have a limited monthly uptime if the associated web service is inactive.
+## Resilience Strategy
+To handle Render's free tier cold starts, the application uses an asynchronous "Waking" indicator. While the frontend remains responsive, critical data handshakes are visualized through a progressive loading bar, ensuring a professional and transparent user experience.

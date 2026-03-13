@@ -30,29 +30,37 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "employeeId", "date", "status", "timestamp"]
+    },
+    "Task": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Task",
+      "type": "object",
+      "description": "Represents an internal HR task or onboarding requirement.",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "in-progress", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "status"]
     }
   },
   "auth": {
     "providers": ["password", "anonymous"]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}/employees/{employeeId}",
-        "definition": {
-          "entityName": "Employee",
-          "schema": { "$ref": "#/backend/entities/Employee" },
-          "description": "Collection of employees for a given HR admin."
-        }
-      },
-      {
-        "path": "/users/{userId}/attendance/{attendanceId}",
-        "definition": {
-          "entityName": "Attendance",
-          "schema": { "$ref": "#/backend/entities/Attendance" },
-          "description": "Global attendance logs indexed by date/employee for the HR admin."
-        }
-      }
-    ]
+    "/users/{userId}/employees/{employeeId}": {
+      "schema": "#/backend/entities/Employee",
+      "description": "Collection of employees for a given HR admin."
+    },
+    "/users/{userId}/attendance/{attendanceId}": {
+      "schema": "#/backend/entities/Attendance",
+      "description": "Global attendance logs indexed by date/employee for the HR admin."
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "#/backend/entities/Task",
+      "description": "Collection of internal tasks for the HR admin."
+    }
   }
 }
